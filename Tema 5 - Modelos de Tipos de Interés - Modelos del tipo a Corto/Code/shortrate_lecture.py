@@ -12,7 +12,9 @@ Original file is located at
 import numpy as np
 from scipy.interpolate import interp1d
 import scipy as sc
+import scipy.stats as st
 import matplotlib.pyplot as plt
+import inspect
 
 plt.style.use('default')
 
@@ -108,7 +110,7 @@ rates = np.array([0.0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.028])
 # Calculo los FD de acuerdo a esa estructura no plana de tipos
 dfs = np.zeros(len(pillar_dates))
 rate_interp = interp1d(dates_rates, rates, kind = 'linear')
-for i in range( len(pillar_dates)):
+for i in range(len(pillar_dates)):
   rate = rate_interp(pillar_dates[i])
   dfs[i] = (np.exp(-rate * (pillar_dates[i] - today)/ 365.25))
 
@@ -167,7 +169,7 @@ std_dev = []
 
 # BUCLE SIMULACIÓN ...
 for date_i in simul_dates:
-  
+  print(date_i)
   N_0_1 = np.random.normal(size = nb_of_simuls)
   zeta_i = ((date_i - today) / 365.25)  * (sigma ** 2)
   X_at_date_i =  N_0_1 * np.sqrt(zeta_i)
@@ -184,7 +186,8 @@ for date_i in simul_dates:
   means.append(mean_ti)
   
   # Calculamos intervalo de confianza ...
-  normal_percentile = sc.stats.norm.ppf(0.975)
+#  normal_percentile = sc.stats.norm.ppf(0.975)
+  normal_percentile = st.norm.ppf(0.975)
   std = np.std(DF_normalized) / np.sqrt(nb_of_simuls) * normal_percentile
   std_dev.append(std)
 
@@ -192,7 +195,12 @@ print('Means: ', means)
   
 # PRINT 
 
-B0T = lgm_curve.get_zero_x(today, T, 0)
+#print(inspect.getsource(lgm_curve.get_zero_x))
+#print(inspect.getsource(ir_curve.get_zero))
+#inspect.getmembers(LGMCurve, lambda a:not(inspect.isroutine(a)))
+B0T = lgm_curve.get_zero_x(today, T, 0) # Este valor es el que devuelve la curva original, tiene X_t = 0
+print('Factor de descuento entre today -> T por modelo LGM con X_t = 0 coincide con FD de la curva original \n', \
+      B0T == ir_curve.get_zero(today, T))
 f, ax = plt.subplots()
 ax.plot(simul_dates, means, 'o', label = 'Discount Factor Normalized ...')  
 ax.plot(simul_dates, B0T + np.array(std_dev), '-', label = 'Upper Confidence Interval')  
