@@ -1,0 +1,559 @@
+\documentclass[titlepage, 10pt,]{article}
+\setlength{\parskip}{1.5pt}
+\setlength{\parindent}{0cm}
+\usepackage{amsmath, amsfonts, graphicx, subcaption}
+%Path relative to the main .tex file 
+\graphicspath{ {./Imagenes/} }
+
+
+\title{Ejercicio 2: EDP Forward de Black - Scholes}
+\author{Los del Grupo 2}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+
+\section{Ejercicio 1: Réplica quanto}
+
+
+\section{Ejercicio 2: EDP Forward de Black-Scholes}
+
+En la EDP de Black-Scholes, teniendo en cuenta que el subyacente evoluciona según el proceso: \\
+
+$dS(t) = rS(t)dt + \sigma(S,t)dW(t)$ \\
+
+$\sigma(S,t) = \sigma S^{\beta}(t)$  \\
+
+Implementar: \\
+
+\begin{itemize}
+	\item Si $\beta = 0.8$, un esquema totalmente implícito con condiciones de Neumann: \\
+		\begin{center}
+			en los bordes: $S_{min} = 0, S_{max} = 4 \cdot S_{0}$ y $\dfrac{\partial^{2}u}{\partial{x}^{2}} = 0$
+		\end{center}
+		
+	\item Además, para el mismo valor de $\beta$, comprobar el resultado para el último vencimiento implementado en un esquema de diferencias finitas implícito en la ecuación backward.
+	
+	\item Smile generado: para los valores de $\beta$ 0.7, 0.8, 0.9, obtener las volatilidades implícitas para los distintos strikes que genera el modelo en los vencimientos 1 mes, 3 meses y 6 meses. Graficar los tres vencimientos por separado.
+	
+	\item Ahora supongamos que estamos valorando un derivado que tiene un pago de un cupón determinista y conocido (por ejemplo 1$\%$) antes del vencimiento, redactar por escrito como se implementaría este pago discreto en un esquema de diferencias finitas.	
+\end{itemize}
+
+Datos: \\
+
+\begin{tabular}{| l | c |}
+	\hline
+		T & 6 meses \\
+		r & 1 $\%$ \\
+		$S_{0}$ & 9 \\
+		K & 8 \\
+		$\sigma$ & 50$\%$\\
+	\hline	
+\end{tabular}
+
+\newpage
+\subsection{EDP Forward}
+
+Para definir el esquema forward, nos apoyaremos en el Teorema Fundamental de Valoración, el cual establece lo siguiente:
+
+\begin{center}
+	$c(T,K) = \dfrac{C(T,K)}{B(t,T)} = E_{\mathbb{Q}}[(S_{T} - K)^{+} \mid \mathcal{F}_{t}]$
+\end{center}
+
+Tomamos el proceso $X_{T} := (S_{T} - K)^{+}$, sobre el cual aplicamos el lema de Itô:
+
+\begin{center}
+	$dX_{T} = \dfrac{\partial X_{T}}{\partial S_{T}} dS_{T} + \dfrac{1}{2} \dfrac{\partial^{2} X_{T}}{\partial S_{T}^{2}}(dS_{T})^{2}$
+\end{center}
+
+Esto se puede definir del siguiente modo:
+
+\begin{center}
+	$dX_{T} = 1_{(S_{T} > K)} r S_{T} dT + \dfrac{1}{2} \partial (S_{T} - K) \sigma^{2}S_{T}^{2\beta}dT + 1_{(S_{T} > K)} \sigma S_{T}^{\beta} dW_{T}^{\mathbb{Q}}$
+\end{center}
+
+A partir de aquí, seguimos un proceso análogo al definido en las notas de clase para obtener la ecuación forward. Es decir, procedemos a integrar la formula anterior entre \textit{t} y \textit{T}, para posteriormente tomar valores esperados condicionados a la filtración $\mathcal{F}_{t}$. Con estos pasos obtenemos la siguiente ecuación:
+
+\begin{center}
+	$c(T,K) - c(t, K) = \displaystyle \int_{t}^{T} r_{h} \left(c(h, K) - K \dfrac{\partial c(T,K)}{\partial K}\right) dh + \dfrac{1}{2} \int_{t}^{T} \sigma_{h}(K)^{2} \dfrac{\partial^{2}c(h, K)}{\partial K^{2}} dh$
+\end{center}
+
+Finalmente, derivando con respecto a T, obtendremos la EDP forward:
+
+\begin{center}
+	$\dfrac{\partial c(T, K)}{\partial T} - r_{T} c(T, K) + r_{T}K \dfrac{\partial c(T, K)}{\partial K} + \dfrac{1}{2} \sigma_{T}^{2}K^{2 \beta} \dfrac{\partial^{2}c(T, K)}{\partial^{2}K} = 0$
+\end{center}
+
+Podemos apreciar que el signo de la derivada de segundo orden con respecto al strike $(K)$ es negativa. La condición inicial asociado a la EDP es la siguiente:
+
+\begin{center}
+	$c(t, K) = (S_{t} - K)^{+}$
+\end{center}
+
+Y las condiciones de contorno serán de tipo Neumann:
+
+\begin{center}
+	$\dfrac{\partial^{2}u}{\partial{x}^{2}} = 0$
+\end{center}
+
+Para resolver la EDP implementamos un esquema implícito de diferencias finitas. 
+
+
+%\begin{center}
+%	\begin{tabular}{ l c c r }
+%	\hline
+%		$x_{j+1}$ & $\circ$ & & $\circ$ \\
+%		 & & & $\downarrow$ \\
+%		$x_{j}$ & $\circ$ & $\longrightarrow$ & $\circ$ \\
+%		 & & & $\uparrow$ \\
+%		$x_{j-1}$ & $\circ$ &  & $\circ$ \\		
+%		 & $t_{i-1}$ &  &$t_{i}$ \\	
+%	\hline	
+%	\end{tabular}
+%\end{center}
+
+
+LA EDP que queremos resolver es una EDP del tipo
+
+\begin{center}
+	$\dfrac{\partial u}{\partial t} + a(x, t) \dfrac{\partial^{2}u}{\partial{x}^{2}} + b(x, t) \dfrac{\partial u}{\partial x} + c(x, t) u = 0$
+\end{center}
+
+con coeficientes variables, donde:
+
+\begin{itemize}
+	\item[] $a(x, t) = -\dfrac{1}{2} \sigma^{2} K^{2\beta}$ 
+	\item[] $b(x, t) = rx$
+	\item[] $c(x, t) = -r$	
+\end{itemize}
+
+
+\textbf{EXPLICACIÓN MALLADO}
+
+Para implementar el esquema  usamos las siguientes diferencias finitas:
+
+\begin{itemize}
+	\item[] $\dfrac{\partial u}{\partial t} \approx
+	 \dfrac{u_{i+1}(j) - u_{i}(j)}{\Delta t}$
+	\item[] $\dfrac{\partial^{2}u}{\partial{x}^{2}} \approx \dfrac{u_{i+1}(j+1) - 2u_{i}(j) + u_{i+1}(j-1)}{(\Delta x)^2}$
+	\item[] $\dfrac{\partial u}{\partial x} \approx \dfrac{u_{i+1}(j+1) - u_{i+1}(j-1)}{2 \Delta x}$
+\end{itemize}
+
+Obteniendo:
+
+\begin{center}
+$\dfrac{u_{i+1}(j) - u_{i}(j)}{\Delta t} + a_{i+1}(j) \dfrac{u_{i+1}(j+1) - 2u_{i}(j) + u_{i+1}(j-1)}{(\Delta x)^2} + b_{i+1}(j) \dfrac{u_{i+1}(j+1) - u_{i+1}(j-1)}{2 \Delta x} + c_{i+1}(j) u_{i+1}(j) = 0$
+\end{center}
+
+Considerando los siguientes valores:
+
+\begin{itemize}
+	\item[] $\alpha = \dfrac{\Delta t}{(\Delta x)^{2}}$
+	\item[] $\rho = \dfrac{\Delta t}{\Delta x}$
+\end{itemize}
+
+Se obtiene:
+
+\begin{center}
+	\begin{multline*}
+		u_{i+1}(j) - u_{i}(j) + \alpha a_{i+1}(j) [u_{i+1}(j+1) - 2u_{i+1}(j) + u_{i+1}(j-1)] \\
+		 + \dfrac{\rho}{2} b_{i+1}(j) [u_{i+1}(j+1) - u_{i+1}(j-1)] + \Delta t c_{i+1}(j) u_{i+1}(j) = 0
+	\end{multline*}
+	
+Agrupando términos:
+
+	\begin{align*}
+		u_{i}(j) &=  u_{i+1}(j+1)[\alpha a_{i+1}(j) + \dfrac{\rho}{2} b_{i+1}(j)] \\ 
+		& + u_{i+1}(j)[1 - 2  \alpha a_{i+1}(j) + \Delta t c_{i+1}(j)] \\
+		& + u_{i+1}(j-1) [\alpha a_{i+1}(j) - \dfrac{\rho}{2} b_{i+1}(j)]
+	\end{align*}
+
+\end{center}
+
+Nos falta considerar las condiciones de contorno de tipo Neumann:
+
+\begin{align*}
+	u_{i+1}(m) &= 2u_{i+1}(m-1) - u_{i+1}(m-2)\\
+	u_{i+1}(0) &= 2u_{i+1}(1) - u_{i+1}(2)
+\end{align*}
+	
+Aplicando las condiciones de contorno en \textit{j = 1} y el punto \textit{j = m - 1} obtenemos: 
+
+\begin{itemize}
+	\item \textbf{j = 1}
+
+		\begin{center}
+			$u_{i}(1) = u_{i+1}(2)[\rho b_{i+1}(1)] + u_{i+1}(1)[1 + \Delta t c_{i+1}(1) - \rho b_{i+1}(1)]$
+		\end{center}
+		
+	\item \textbf{j = m - 1}
+
+
+		\begin{align*}
+			u_{i}(m - 1) &= \\
+			& u_{i+1}(m - 1)[1 + \Delta t c_{i+1}(m - 1) - \rho b_{i+1}(m - 1)] + u_{i+1}(m - 2)[-\rho b_{i+1}(m - 1)]
+		\end{align*}
+
+\end{itemize}
+
+El algoritmo se puede escribir de forma matricial; se inicializa la solución para i = 0:
+
+		\begin{align*}
+			u_0(j) = U_0(x_j), \qquad j=0,\ldots,m
+		\end{align*}
+
+donde $U_0$ es nuestra condición inicial. Para los sucesivos tiempos $i=n-1,\ldots,0$ se calculará la solución $\lbrace u_n(j) \rbrace^m_{j=0}$ a partir de la solución del instante posterior dado por el sistema lineal $(m-1)\times (m-1)$.
+
+\begin{align*}
+	M^{i+1}u_{i+1} &= u_{i} \Longrightarrow
+	u_{i+1} &= (M^{i+1})^{-1} u_{i}
+\end{align*}
+
+donde la matriz viene definida como sigue:
+
+
+\begin{center}
+$$ M^{i+1} = 
+	\begin{pmatrix}
+		diag_{i+1}(1) & up_{i+1}(1) & \cdots & \cdots \\
+		low_{i+1}(2) & diag_{i+1}(2) & up_{i+1}(2) & \cdots \\
+		\vdots  & \vdots  & \ddots & \vdots  \\
+		\vdots  & \vdots  & low_{i+1}(m - 1) & diag_{i+1}(m - 1) \\ 
+	\end{pmatrix}
+$$
+\end{center}
+
+con:\\
+
+\textbf{AÑADIR DIAG, UP, LOW}
+
+
+
+Dentro del archivo Excel "Ejercicio 2" (en la pestaña Forward) y el notebook "Notebook$\_$Ejercicio$\_$2.ipynb" adjuntos, se han implementado la solución. Se pueden modificar los parámetros para poder ver las sensibilidades, por ejemplo a las variaciones de $\beta$. Las pequeñas diferencias que hemos encontrado entre ambos archivos consideramos que se deben a diferencias numéricas, ya que los resultados empiezan a discrepar a partir del tercer decimal.
+
+\vspace{5pt}
+En la imagen \ref{fig: EDP Forward} podemos observar ambas gráficas de superficie:
+
+\begin{figure}
+	\begin{subfigure}{7cm}
+    	\centering\includegraphics[width=6cm]{PyEDPForward}
+  	\end{subfigure}
+  	\begin{subfigure}{7cm}
+    	\centering\includegraphics[width=6cm]{ExEDPForward}
+  	\end{subfigure}
+  	\caption{Precio de Opción con EDP Forward con Python (izq) y Excel (der)}
+  	\label{fig: EDP Forward}
+\end{figure}
+
+
+
+
+
+\newpage
+\subsubsection*{EDP Backward}
+
+La segunda parte del ejercicio nos pide comprobar el resultado implementando un esquema de diferencias finitas para la ecuación backward. En este caso la EDP:
+
+\begin{center}
+	$\dfrac{\partial u}{\partial t} + a(x, t) \dfrac{\partial^{2}u}{\partial{x}^{2}} + b(x, t) \dfrac{\partial u}{\partial x} + c(x, t) u = 0$
+\end{center}
+
+presenta los siguientes parámetros:
+
+\begin{itemize}
+	\item[] $a(x, t) = \dfrac{1}{2} \sigma^{2} S_{t}^{2\beta}$ 
+	\item[] $b(x, t) = rS_{t}$
+	\item[] $c(x, t) = -r$	
+\end{itemize}
+
+\vspace{7pt}
+LA anterior EDP tiene la ondición final:
+\begin{center}
+	$c(T, K) = (S_{T} - K)^{+}$
+\end{center}
+
+y las condiciones de contorno de tipo Neummann:
+
+\begin{center}
+	$\dfrac{\partial^{2}u}{\partial{x}^{2}} = 0$
+\end{center}
+
+No vamos a extendernos en el desarrollo de las diferencias finitas para esta ecuación ya que ha sido visto en clase. La ecuación en diferencias finitas en este caso queda de la siguiente forma:
+
+\begin{center}
+	$\dfrac{u_{i}(j) - u_{i-1}(j)}{\Delta t} + a_{i-1}(j) \dfrac{u_{i-1}(j+1) - 2u_{i-1}(j) + u_{i-1}(j-1)}{(\Delta x)^2} + b_{i-1}(j) \dfrac{u_{i-1}(j+1) - u_{i-1}(j-1)}{2 \Delta x} + c_{i-1}(j) u_{i-1}(j) = 0$
+\end{center}
+
+Operando y reorganizando obtenemos:
+\begin{align*}
+	u_{i}(j) &=  u_{i-1}(j+1)[-\alpha a_{i-1}(j) + \dfrac{\rho}{2} b_{i-1}(j)] \\ 
+	& + u_{i-1}(j)[1 + 2  \alpha a_{i+1}(j) - \Delta t c_{i+1}(j)] \\
+	& + u_{i-1}(j-1) [-\alpha a_{i+1}(j) - \dfrac{\rho}{2} b_{i+1}(j)]
+\end{align*}
+
+
+\textbf{Añadir como queda en los bordes con las condiciones de Neumann}
+
+
+
+\textbf{******* ESCRIBIR ESTA PARTE CON LA MISMA ESTRUCTURA Y CAMBIOS DE LA PARTE FORWARD}
+
+En este caso, llegamos también a un sistema lineal de ecuaciones de la siguiente forma:
+
+\begin{align*}
+	M^{i-1}u_{i-1} &= u_{i} \\
+	u_{i-1} &= (M^{i-1})^{-1} u_{i}
+\end{align*}
+
+Que se resolverá de forma iterativa, para los tiempos \textit{i = n, n - 1, ..., 1, 0}. Por lo tanto, en este caso, partiendo de la condición final, en tiempo \textit{n}, vamos resolviendo el sistema "hacia atrás".
+
+
+\textbf{*******}
+
+
+\vspace{5pt}
+Dentro del archivo Excel "Ejercicio 2" (en la pestaña Forward) y el notebook "Notebook$\_$Ejercicio$\_$2.ipynb" adjuntos, se han implementado la solución. Se pueden modificar los parámetros para poder ver las sensibilidades, por ejemplo a las variaciones de $\beta$. Las pequeñas diferencias que hemos encontrado entre ambos archivos consideramos que se deben a diferencias numéricas, ya que los resultados empiezan a discrepar a partir del tercer decimal.
+
+\vspace{5pt}
+En la imagen \ref{fig: EDP Backward} podemos observar ambas gráficas de superficie.
+
+\begin{figure}[h]
+	\begin{subfigure}{7cm}
+    	\centering\includegraphics[width=6cm]{PyEDPBackward}
+  	\end{subfigure}
+  	\begin{subfigure}{7cm}
+    	\centering\includegraphics[width=6cm]{ExEDPBackward}
+  	\end{subfigure}
+  	\caption{Precio de Opción con EDP Backward con Python (izq) y Excel (der)}
+  	\label{fig: EDP Backward}
+\end{figure}
+
+\vspace{5pt}
+\textbf{*****	EXPLICA ESTA PARTE MEJOR ****
+
+
+
+Finalmente, para poder realizar la comprobación se ha montado tanto en el Excel "Ejercicio 2" (en la pestaña Backwards) y el notebook "Notebook$\_$Ejercicio$\_$2.ipynb" adjuntos, un esquema implícito de la EDP backwards, en ambos casos se puede comprobar que fijado el mismo $\beta$, y para un spot del subyacente de 9, seleccionaremos 3 valores de strike distintos, podemos comprobar como es posible recuperar el precio aplicando la EDP forward y backwards \footnote{Se han incluido los resultados del "Notebook$\_$Ejercicio$\_$2.ipynb"}.
+
+\begin{center}
+	\begin{tabular}{c c c c c}
+	\hline
+	Subyacente & $\beta$ & Strike & Valor EDP Forward & Valor EDP Backward \\
+	\hline 
+	9 & 0.7 & 2.159 & 6.885 & 6.850 \\
+	9 & 0.7 & 4.319 & 4.725 & 4.701 \\
+	9 & 0.7 & 5.760 & 3.290 & 3.273 \\	
+	\hline
+	\end{tabular}
+\end{center} 
+
+\newpage
+\subsubsection*{Smile}
+
+La tercera parte del ejercicio, nos solicita obtener las volatilidades implícitas para valores de $\beta$ de 0.7, 0.8 y 0.9 para distintos strikes para vencimientos de 1 mes, 3 meses y 6 meses. 
+
+
+Para obtener dicha volatilidad implícita, se busca empleando un solver la volatilidad que al ser incluida como input en el modelo de Black - Scholes, replica el valor de la call obtenido para cada nivel de $K$. Se han obtenido las volatilidades implícitas mediante algoritmos que minimizan la diferencia entre el valor obtenido con el modelo de Black - Scholes, y el valor obtenido mediante la resolución de la EDP. 
+
+
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.65]{TTM1}
+	\caption{TTM = 1 mes}
+\end{figure}
+
+\begin{figure}[!]
+	\centering
+	\includegraphics[scale=0.65]{TTM3}
+	\caption{TTM = 3 mes}
+\end{figure}
+
+\begin{figure}[!]
+	\centering
+	\includegraphics[scale=0.65]{TTM6}
+	\caption{TTM = 6 mes}
+\end{figure}
+
+
+
+\textbf{COMENTAR RESULTADOS}
+
+
+
+\newpage
+\subsubsection*{Derivado que tiene un pago de un cupón determinista y conocido antes del vencimiento}
+
+Dado que se trata de un pago conocido, la EDP a resolver para obtener el precio del derivado (V) se reduce a la siguiente expresión:
+
+\begin{center}
+	$\dfrac{\partial V_{t}}{\partial t} = rV$
+\end{center}
+
+Donde \textit{r} es el tipo de interés (que suponemos constante).
+
+\vspace{5pt}
+Sea \textit{T} el vencimiento del derivado, $t_{p}$ el tiempo de pago del cupón y $t_{0}$ el tiempo inicial. Supondremos que $t_{0}=0$. Notemos que la relación entre estos tiempos es: $t_{0} \leq t_{p} \leq T$.  
+
+\vspace{5pt}
+Sabemos que la solución analítica, obtenida resolviendo la ecuación, es la siguiente (integrando entre t y T):
+
+\begin{align*}
+	\dfrac{\partial V_{t}}{\partial t} &= rV \\
+	\dfrac{\partial V_{t}}{V} &= r\partial t \\
+	ln(V_{T}) - ln(V_{t}) &= \displaystyle \int_{t}^{T} r\partial t\\
+	ln(V_{T}) &= ln(V_{t}) + r(T - t) \\
+	V_{T} &= V_{t}\exp^{r(T-t)} \\
+	V_{t} &= V_{T} \exp^{-r(T-t)} \\
+\end{align*}
+
+Sea \textit{C} el pago del cupón (1$\%$ por el nominal si seguimos el ejemplo del enunciado). Tenemos la condición de que $V_{t_{p}} = C$. Por lo que:
+
+\begin{center}
+	$C = V_{t_{p}} = V_{T} \exp^{-r(T-t_{p})} \longrightarrow V_{T} = C\exp^{r(T-t_{p})} \longrightarrow V_{t} = V_{T} \exp^{-r(t_{p}-t)} $
+\end{center}
+	
+Para todo \textit{t} entre \textit{0} y \textit{T}. Si queremos valorar el derivado en  \textit{t} = 0, se tiene:
+
+\begin{center}
+	$V_{0} = C\exp^{-rt_{p}}$
+\end{center}
+
+Veamos cómo implementar este pago por un esquema de diferencias finitas. Dado que tenemos una condición “intermedia” una posible solución es implementar un esquema backward para valores de \textit{t} entre 0 y $t_{p}$, y un esquema forward para valores de \textit{t} entre $t_{p}$ y  \textit{T}. Veamos cómo quedaría los diferentes esquemas tanto para la parte backward como para la parte forward. 
+
+\vspace{5pt}
+Como \textit{V} sólo tiene dependencia temporal se realiza un mallado espaciador únicamente en una dimensión. En este caso consideraremos un mallado para el lado de la backward y otro para el de la forward.
+
+\begin{itemize}
+	\item[\textbf{a)}] \textbf{Backward:} Tomamos un mallado de $N_{1}$ puntos entre $t_{0} = 0$ y $t_{p}$. Es decir, compuesto por $\left\lbrace t_{i} \right\rbrace_{i = 0}^{N_{1}}$ donde $t_{i} = t_{0} + i \Delta t \forall i$. Sea $\Delta t = \dfrac{t_{p}}{N_{1}}$ 
+	
+	\item[\textbf{b)}] \textbf{Forward:} Tomamos un mallado de $N_{2}$ puntos entre $t_{p}$ y \textit{T}. Es decir, compuesto por $\left\lbrace t_{j} \right\rbrace_{j = 0}^{N_{2}}$ donde $t_{j} = t_{p} + j \overline{\Delta t} \forall j$. Sea $\overline{\Delta t} = \dfrac{t_{p}}{N_{1}}$ 
+\end{itemize}
+
+A continuación denotaremos por \textit{V} al valor del derivado para la parte Backward y $\overline{V}$ para la parte Forward.
+
+\begin{itemize}
+	\item \textbf{Esquema explícito}
+
+	\vspace{5pt}
+	Partimos de:
+		\begin{center}
+			$\dfrac{V(i) - V(i-1}{\Delta t} = r V(i)$
+		\end{center}
+	
+	Despejando, se obtienen los siguientes esquemas para Backward y Forward, respectivamente:
+		\begin{align*}
+			V(i - 1) &= (1 - r \Delta t)V(i) \\
+			\overline{V}(i) &= (1 - r \overline{\Delta t})^{-1} \overline{V}(i - 1) \\
+		\end{align*}
+		
+		\begin{itemize}
+			\item[\textit{a)}] \textit{Backward:}
+			
+			\vspace{5pt}
+			Con la condición final:
+				\begin{center}
+					$V(N_{1}) = C$
+				\end{center}
+			Si deseáramos conocer el valor \textit{V(0)}, según el esquema anterior llegaríamos a:
+				\begin{center}
+					$V(0) = (1 - r \Delta t)^{N_{1}} C$
+				\end{center}
+			
+			\item[\textit{b)}] \textit{Forward:}
+			
+			\vspace{5pt}
+			Con la condición inicial, en $t_{p}$:
+				\begin{center}
+					$\overline{V}(0) = C$
+				\end{center}
+			Si deseáramos conocer el valor $\overline{V}(N_{2})$, según el esquema anterior llegaríamos a:
+				\begin{center}
+					$\overline{V}(N_{2}) = (1 - r \overline{\Delta t})^{-N_{2}} C$
+				\end{center}
+		\end{itemize}
+		
+	\item \textbf{Esquema implícito}
+
+	\vspace{5pt}
+	Partimos de:
+		\begin{center}
+			$\dfrac{V(i) - V(i-1}{\Delta t} = r V(i-1)$
+		\end{center}
+	
+	Despejando, se obtienen los siguientes esquemas para Backward y Forward, respectivamente:
+		\begin{align*}
+			V(i - 1) &= (1 + r \Delta t)^{-1}V(i) \\
+			\overline{V}(i) &= (1 - r \overline{\Delta t}) \overline{V}(i - 1) \\
+		\end{align*}
+		
+		\begin{itemize}
+			\item[\textit{a)}] \textit{Backward:}
+			
+			\vspace{5pt}
+			Con la condición final:
+				\begin{center}
+					$V(N_{1}) = C$
+				\end{center}
+			Si deseáramos conocer el valor \textit{V(0)}, según el esquema anterior llegaríamos a:
+				\begin{center}
+					$V(0) = (1 + r \Delta t)^{-N_{1}} C$
+				\end{center}
+			
+			\item[\textit{b)}] \textit{Forward:}
+			
+			\vspace{5pt}
+			Con la condición inicial, en $t_{p}$:
+				\begin{center}
+					$\overline{V}(0) = C$
+				\end{center}
+			Si deseáramos conocer el valor $\overline{V}(N_{2})$, según el esquema anterior llegaríamos a:
+				\begin{center}
+					$\overline{V}(N_{2}) = (1 - r \overline{\Delta t})^{N_{2}} C$
+				\end{center}
+		\end{itemize}
+	
+	\item \textbf{Crank - Nicholson}
+
+	\vspace{5pt}
+	Recordemos que este método es un promedio de los dos anteriores. En este caso se tiene:
+	
+		\begin{center}
+			$\dfrac{V(i) - V(i-1}{\Delta t} = r \left(\dfrac{V(i-1)}{2} + \dfrac{V(i)}{2} \right)$
+		\end{center}
+	
+	Despejando, se obtienen los siguientes esquemas para Backward y Forward, respectivamente:
+		\begin{align*}
+			V(i - 1) &= \dfrac{2 - r \Delta t}{2 + r \Delta t} V(i) \\
+			\overline{V}(i) &= \dfrac{2 - r \overline{\Delta t}}{2 + r \overline{\Delta t}} \overline{V}(i - 1) \\
+		\end{align*}
+	
+	\begin{itemize}
+			\item[\textit{a)}] \textit{Backward:}
+			
+			\vspace{5pt}
+			Con la condición final:
+				\begin{center}
+					$V(N_{1}) = C$
+				\end{center}
+			Si deseáramos conocer el valor \textit{V(0)}, según el esquema anterior llegaríamos a:
+				\begin{center}
+					$V(0) = \left(\dfrac{2 - r \Delta t}{2 + r \Delta t} V(i)\right)^{N_{1}} C$
+				\end{center}
+			
+			\item[\textit{b)}] \textit{Forward:}
+			
+			\vspace{5pt}
+			Con la condición inicial, en $t_{p}$:
+				\begin{center}
+					$\overline{V}(0) = C$
+				\end{center}
+			Si deseáramos conocer el valor $\overline{V}(N_{2})$, según el esquema anterior llegaríamos a:
+				\begin{center}
+					$\overline{V}(N_{2}) = \left(\dfrac{2 - r \overline{\Delta t}}{2 + r \overline{\Delta t}}\right)^{N_{2}} C$
+				\end{center}
+	\end{itemize}		
+\end{itemize}
+
+\end{document}
