@@ -153,6 +153,8 @@ ax.legend()
 
 f.set_size_inches(6, 3)
 
+#%% Validamos que LGM cumple TFM
+# 
 """# **Prueba: Validar que el LGM cumple con el Teorema Fundamental de Valoración**
 
 1. Simulamos el Factor de descuento a futuro de acuerdo al LGM y normalizamos path a path por el numerario.
@@ -205,7 +207,7 @@ f, ax = plt.subplots()
 ax.plot(simul_dates, means, 'o', label = 'Discount Factor Normalized ...')  
 ax.plot(simul_dates, B0T + np.array(std_dev), '-', label = 'Upper Confidence Interval')  
 ax.plot(simul_dates, B0T - np.array(std_dev), '-', label = 'Lower Confidence Interval')
-
+ax.legend();
 #%%
 """## **1. Valorar Caplets de acuerdo al LGM en función del strike**"""
 
@@ -231,7 +233,7 @@ ir_curve = IRCurve(pillar_dates, dfs)
 # Parámetros del LGM
 kappa = 0.01
 sigma = 0.01  # SIGMA del proceso X
-lgm_curve = LGMCurve(ir_curve, kappa, sigma )
+lgm_curve = LGMCurve(ir_curve, kappa, sigma)
 
 # Definimos características del caplet ..
 # tj (fecha de fijación del libor).
@@ -382,7 +384,7 @@ print("Derivada Derecha \n", der_right[0:10])
 second_der = (premium[0:-2] - 2 * premium[1:-1] + premium[2:]) / (dK*dK) # La segunda derivad descarta dos elementos
 ax.plot(K[0:-2], second_der, '-', label = 'Density function')
 
-#%%
+#%% SMILE VOLATILIDAD
 ### **Calculo del Smile de volatilidad**
 """
 Invertimos las primas del caplet para sacarnos el smile de Volatilidad
@@ -424,6 +426,8 @@ for i in range(len(K)):
 # Graficamos el smile de volatilidad
 f, ax = plt.subplots()
 ax.plot(K, implicit_vols, 'o', label = 'Smile de volatilidad (LGM)')
+
+#ax.plot(implicit_vols, K, 'o', label = 'Smile de volatilidad (LGM)')
 
 # Resultados
 print("Vol implicita - necesaria para recuperar precios usando BS \n", implicit_vols)  
@@ -470,11 +474,16 @@ f, ax = plt.subplots()
 ax.plot(K, implicit_vols, 'o', label = 'LGM smile vola')
 ax.legend();
 
+## Graficamos el smile de volatilidad
+#f, ax = plt.subplots()
+#ax.plot(implicit_vols, K, 'o', label = 'Smile de volatilidad (LGM)')
+
+
 print("Vol implicita - necesaria para recuperar precios usando BS \n", implicit_vols)
 # Como hemos corregido el el modelo, desplazandolo, las Vol implicitas son iguales a la vol del LGM
 print("Vol de modelo LGM \n", sigma * (H(kappa, time_to_pymt_date) - H(kappa, time_to_mty_date)))
 
-#%%
+#%% SWAPTION & IRS
 # Valorar IRS de acuerdo a LGM
 
 """![texto alternativo](https://docs.google.com/a/bbva.com/drawings/d/e/2PACX-1vRbaWl-u8mzZt3u8xsCl-f6GKaTMlz_wBIR4Qft036A-OzLeFHtNboK3arMQfaDb7wSQ_C1dbOxi_1I/pub?w=960&h=720)
@@ -517,7 +526,7 @@ class IRS:
     self.end_date = start_date + tenor * 365.25
     self.fix_dates = np.linspace(self.start_date, self.end_date, tenor * freq) 
     self.fixed_coupon = fixed_coupon
-    self.dcf = (self.fix_dates[1:] - self.fix_dates[0:-1])/360 # Act/360
+    self.dcf = (self.fix_dates[1:] - self.fix_dates[0:-1])/360 # Act/360 - Day Count Fraction
     self.fix_dates = self.fix_dates[1:]
 
 
@@ -552,7 +561,12 @@ def LGM_Swaption_Price(value_date, irs, lgm_curve):
   def ZC_put(T_j):
     # Valoramos la última put sobre ZC
     fwd = lgm_curve.get_zero_x(value_date, T_j, 0) / \
-          lgm_curve.get_zero_x(value_date, irs.start_date, 0)
+          lgm_curve.get_zero_x(value_date, irs.start_date, 0) # El cero hace que X_t = 0, por lo tanto, como irs.get_zero
+
+        '''
+        Al ser X_t = 0 
+        lgm_curve.get_zero_x(today, irs.start_date, 0) == ir_curve.get_zero(today, irs.start_date)
+        '''
 
     # strike B(T, T_N, x_star)
     strike = lgm_curve.get_zero_x(irs.start_date, T_j, x_star)
@@ -566,8 +580,15 @@ def LGM_Swaption_Price(value_date, irs, lgm_curve):
     vol = np.abs(vol)
 
     # Llamamos BS
+    '''
+    Al aplicar LGM al IRS+ (swaption) hemos obtenido que el proceso sigue
+    es martingala con dinamica LN
+    Por lo tanto, se puede aplicar un BS_LN al uso
+    '''
+    # Por que la fomula LN_BlackScholes es para Call
     last_call = LN_BlackScholes(fwd, strike, \
                                (irs.start_date - value_date)/365.25, vol)
+    # Put-Call parity en T (prima forward)
     last_put = last_call - (fwd - strike)
     
     return last_put
@@ -581,11 +602,14 @@ def LGM_Swaption_Price(value_date, irs, lgm_curve):
     # Calculate put
     put = ZC_put(irs.fix_dates[i])
     
-    # Calculate K Delta o (1 + K Delta)
+    # Calculate K*Delta o (1 + K*Delta)
     notional = irs.dcf[i] * irs.fixed_coupon 
-    if i == len(irs.fix_dates)-1:
+    if i == len(irs.fix_dates)-1: # ULTIMA FECHA DE PAGO T_N
       notional += 1 
-      
+    '''
+    En esta ultima fecha de pago se igualan los BS por lo tanto es
+    (1 + K*Delta) que se multiplica por el valor de la put!
+    '''
       
     # Actualizamos el precio del swaption
     swaption += notional * put
@@ -643,7 +667,7 @@ NO ESTOY SEGURO DE QUE SIRVA PARA NADA
 #      floating_leg / fixed_leg
 #      lgm_curve._sigma
 
-#%%
+#%% Swaption por Integral Numérica
 """# **Valoración del Swaption por Integral Numérica**
 
 $swaption = E^{\mathbb{N}}_{t} [\dfrac{IRS(T,X_{T})^{+}}{N(T,X_{T})}] = \displaystyle \int_{-\infty}^{\infty }\dfrac{IRS(T,X_{T})^{+}}{N(T,X_{T})} \eta_{X_{T}|X_{0}}(x)d(x)$
